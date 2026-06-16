@@ -61,6 +61,7 @@ export const DESKTOP_FLOATING_BUTTONS: FloatingButtonsList = [
     RelationMapButtons,
     CopyImageReferenceButton,
     ExportImageButtons,
+    PublishButton,
     InAppHelpButton,
     Backlinks
 ];
@@ -437,4 +438,35 @@ function needsRefresh(note: FNote, loadResults: LoadResults) {
     return loadResults.getAttributeRows().some(attr =>
         attr.type === "relation" &&
         attributes.isAffecting(attr, note));
+}
+
+/** Publish button for self-media articles (自媒体文章) */
+function PublishButton({ note, isDefaultViewMode }: FloatingButtonContext) {
+    const isEnabled = note.type === "article" && isDefaultViewMode;
+    const [publishState, setPublishState] = useState<{ published: boolean; count: number }>({ published: false, count: 0 });
+
+    useEffect(() => {
+        if (note.type === "article") {
+            server.get(`publisher/status/${note.noteId}`).then((resp: any) => {
+                const platforms = resp?.publishState?.platforms || {};
+                const states = Object.values(platforms) as any[];
+                const published = states.filter((s: any) => s.status === "success");
+                setPublishState({ published: published.length > 0, count: published.length });
+            }).catch(() => {});
+        }
+    }, [note.noteId]);
+
+    if (!isEnabled) return false;
+
+    return (
+        <FloatingButton
+            text={publishState.published
+                ? `已发布 (${publishState.count})`
+                : "📤 发布"}
+            icon={publishState.published ? "bx bx-check-circle" : "bx bx-send"}
+            onClick={() => {
+                appContext.triggerEvent("openPublishDialog", { noteId: note.noteId });
+            }}
+        />
+    );
 }

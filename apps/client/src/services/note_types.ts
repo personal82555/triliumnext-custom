@@ -27,6 +27,7 @@ export const NOTE_TYPES: NoteTypeMapping[] = [
 
     // The default note type (always the first item)
     { type: "text", mime: "text/html", title: t("note_types.text"), icon: "bx-note" },
+    { type: "article", mime: "application/json", title: "自媒体文章", icon: "bx-news", isNew: true },
     { type: "spreadsheet", mime: "application/json", title: t("note_types.spreadsheet"), icon: "bx-table", isBeta: true, isNew: true },
 
     // Text notes group

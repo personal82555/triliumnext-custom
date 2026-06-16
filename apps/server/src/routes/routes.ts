@@ -11,6 +11,8 @@ import etapiBackupRoute from "../etapi/backup.js";
 import etapiBranchRoutes from "../etapi/branches.js";
 import etapiMetricsRoute from "../etapi/metrics.js";
 import etapiNoteRoutes from "../etapi/notes.js";
+import etapiPublishingRoutes from "../etapi/publishing.js";
+import etapiMediaRoutes from "../etapi/media.js";
 import etapiRevisionsRoutes from "../etapi/revisions.js";
 import etapiSpecRoute from "../etapi/spec.js";
 import etapiSpecialNoteRoutes from "../etapi/special_notes.js";
@@ -28,6 +30,7 @@ import llmSpecialNotesRoute from "./api/llm_special_notes.js";
 import loginApiRoute from "./api/login.js";
 import metricsRoute from "./api/metrics.js";
 import ocrRoute from "./api/ocr.js";
+import { registerPublisherApi } from "./api/publisher_frontend.js";
 import recoveryCodes from './api/recovery_codes.js';
 import senderRoute from "./api/sender.js";
 import systemInfoRoute from "./api/system_info.js";
@@ -194,6 +197,10 @@ function register(app: express.Application) {
     etapiBackupRoute.register(router);
     etapiMetricsRoute.register(router);
 
+    // Publisher & Media routes (自媒体扩展)
+    etapiPublishingRoutes.register(router);
+    etapiMediaRoutes.register(router);
+
     // OCR API
     asyncApiRoute(PST, "/api/ocr/process-note/:noteId", ocrRoute.processNoteOCR);
     asyncApiRoute(PST, "/api/ocr/process-attachment/:attachmentId", ocrRoute.processAttachmentOCR);
@@ -201,6 +208,9 @@ function register(app: express.Application) {
     asyncApiRoute(GET, "/api/ocr/batch-progress", ocrRoute.getBatchProgress);
     asyncApiRoute(GET, "/api/ocr/notes/:noteId/text", ocrRoute.getNoteOCRText);
     asyncApiRoute(GET, "/api/ocr/attachments/:attachmentId/text", ocrRoute.getAttachmentOCRText);
+
+    // Publisher API (自媒体发布)
+    registerPublisherApi(apiRoute, asyncApiRoute);
 
     app.use("", router);
 }
