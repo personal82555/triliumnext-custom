@@ -57,25 +57,49 @@ const { models: AVAILABLE_MODELS, pricing: MODEL_PRICING } = buildModelList([
     }
 ]);
 
+export interface CustomModelDef {
+    id: string;
+    name: string;
+}
+
 export class OpenAiProvider extends BaseProvider {
     name = "openai";
     protected defaultModel = "gpt-4.1";
     protected titleModel = "gpt-4.1-mini";
-    protected availableModels = AVAILABLE_MODELS;
-    protected modelPricing = MODEL_PRICING;
+    protected availableModels: ModelInfo[];
+    protected modelPricing: Record<string, ModelPricing>;
 
     private openai: OpenAISDKProvider;
 
-    constructor(apiKey: string, baseURL?: string) {
+    constructor(apiKey: string, baseURL?: string, customModels?: CustomModelDef[]) {
         super();
-        if (!apiKey) {
-            throw new Error("API key is required for OpenAI provider");
-        }
         this.openai = createOpenAI({ apiKey, ...(baseURL && { baseURL }) });
+
+        if (customModels && customModels.length > 0) {
+            const first = customModels[0];
+            this.defaultModel = first.id;
+            this.titleModel = first.id;
+            this.availableModels = customModels.map((m, i) => ({
+                id: m.id,
+                name: m.name,
+                pricing: { input: 0, output: 0 },
+                isDefault: i === 0,
+                contextWindow: 128000
+            }));
+            this.modelPricing = Object.fromEntries(
+                customModels.map(m => [m.id, { input: 0, output: 0 }])
+            );
+        } else {
+            this.availableModels = AVAILABLE_MODELS;
+            this.modelPricing = MODEL_PRICING;
+        }
     }
 
     protected createModel(modelId: string) {
-        return this.openai(modelId);
+        // Use chat() explicitly to force Chat Completions API (/v1/chat/completions)
+        // instead of the newer Responses API (/v1/responses), for broader
+        // compatibility with OpenAI-compatible providers.
+        return this.openai.chat(modelId);
     }
 
     protected override addWebSearchTool(tools: ToolSet): void {

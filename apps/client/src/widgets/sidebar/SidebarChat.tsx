@@ -44,10 +44,12 @@ export default function SidebarChat() {
     const chatNoteIdRef = useRef(chatNoteId);
     chatNoteIdRef.current = chatNoteId;
 
-    // Use shared chat hook with sidebar-specific options
+    // Use shared chat hook with sidebar-specific options.
+    // Use a ref for the onMessagesChange callback to avoid capture order issues
+    // (the save callback is defined below, similar to how LlmChat.tsx uses spacedUpdateRef).
+    const triggerSaveRef = useRef<() => void>(() => {});
     const chat = useLlmChat(
-        // onMessagesChange - trigger save
-        () => spacedUpdate.scheduleUpdate(),
+        () => triggerSaveRef.current(),
         { defaultEnableNoteTools: true, supportsExtendedThinking: true }
     );
 
@@ -69,6 +71,7 @@ export default function SidebarChat() {
             console.error("Failed to save chat:", err);
         }
     });
+    triggerSaveRef.current = () => spacedUpdate.scheduleUpdate();
 
     // Update chat context when active note changes
     useEffect(() => {
@@ -152,25 +155,48 @@ export default function SidebarChat() {
     }, [chatNoteId, chat]);
 
     const handleNewChat = useCallback(async () => {
-        // Save any pending changes before switching
-        await spacedUpdate.updateNowIfNecessary();
+        console.log("SidebarChat: handleNewChat called, clearing messages...");
+        let newChatNoteId: string | null = null;
+
+        // Save any pending changes before switching (best-effort, don't block the action)
+        try {
+            await spacedUpdate.updateNowIfNecessary();
+        } catch (err) {
+            console.error("Failed to save current chat before new chat:", err);
+        }
 
         try {
             const note = await dateNoteService.createLlmChat();
             if (note) {
-                setChatNoteId(note.noteId);
-                chatRef.current.clearMessages();
+                newChatNoteId = note.noteId;
+                console.log("SidebarChat: created new chat note:", note.noteId);
+            } else {
+                console.error("SidebarChat: createLlmChat returned null");
             }
         } catch (err) {
             console.error("Failed to create new chat:", err);
         }
-    }, [spacedUpdate]);
+
+        if (newChatNoteId) {
+            setChatNoteId(newChatNoteId);
+        } else {
+            // If note creation failed, clear messages and set no note id
+            // so the next message send will create a new chat lazily
+            setChatNoteId(null);
+        }
+        // Always clear messages when starting a new chat (after async ops to avoid flicker)
+        chatRef.current.clearMessages();
+    }, [spacedUpdate, chatRef]);
 
     const handleSaveChat = useCallback(async () => {
         if (!chatNoteId) return;
 
-        // Save any pending changes before moving the chat
-        await spacedUpdate.updateNowIfNecessary();
+        // Save any pending changes before moving the chat (best-effort)
+        try {
+            await spacedUpdate.updateNowIfNecessary();
+        } catch (err) {
+            console.error("Failed to save chat before save-to-permanent:", err);
+        }
 
         try {
             await server.post("special-notes/save-llm-chat", { llmChatNoteId: chatNoteId });
@@ -200,25 +226,36 @@ export default function SidebarChat() {
     }, []);
 
     const handleSelectChat = useCallback(async (noteId: string) => {
+        console.log("SidebarChat: handleSelectChat called, noteId:", noteId);
         historyDropdownRef.current?.hide();
 
-        if (noteId === chatNoteId) return;
+        if (noteId === chatNoteId) {
+            console.log("SidebarChat: already on selected chat, skipping");
+            return;
+        }
 
-        // Save any pending changes before switching
-        await spacedUpdate.updateNowIfNecessary();
+        // Save any pending changes before switching (best-effort)
+        try {
+            await spacedUpdate.updateNowIfNecessary();
+        } catch (err) {
+            console.error("Failed to save current chat before switching:", err);
+        }
 
-        // Load the selected chat's content
         try {
             const blob = await server.get<{ content: string }>(`notes/${noteId}/blob`);
             if (blob?.content) {
                 const parsed: LlmChatContent = JSON.parse(blob.content);
+                console.log("SidebarChat: loaded chat content, messages:", parsed.messages?.length ?? 0);
                 setChatNoteId(noteId);
                 chatRef.current.loadFromContent(parsed);
+                console.log("SidebarChat: state updated for chat switch");
+            } else {
+                console.error("Failed to load selected chat: no content in blob");
             }
         } catch (err) {
             console.error("Failed to load selected chat:", err);
         }
-    }, [chatNoteId, spacedUpdate]);
+    }, [chatNoteId, spacedUpdate, chatRef]);
 
     return (
         <RightPanelWidget

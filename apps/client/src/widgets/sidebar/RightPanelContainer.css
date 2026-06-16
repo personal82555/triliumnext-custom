@@ -69,3 +69,34 @@ body.experimental-feature-new-layout #right-pane {
         padding-top: 0;
     }
 }
+
+/* Make the right-pane gutter more visible and easier to grab */
+#center-pane + .gutter.gutter-horizontal {
+    cursor: col-resize;
+    min-width: 5px;
+    background: var(--main-border-color) !important;
+    position: relative;
+}
+
+#center-pane + .gutter.gutter-horizontal:hover {
+    background: var(--gutter-hover-color, var(--accent-color)) !important;
+}
+
+/* Add a subtle visual handle in the center of the gutter */
+#center-pane + .gutter.gutter-horizontal::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 30px;
+    border-radius: 1px;
+    background: var(--muted-text-color);
+    opacity: 0.4;
+    transition: opacity 150ms ease-out;
+}
+
+#center-pane + .gutter.gutter-horizontal:hover::after {
+    opacity: 0.8;
+}

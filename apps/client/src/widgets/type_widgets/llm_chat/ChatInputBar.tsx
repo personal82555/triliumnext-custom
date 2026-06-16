@@ -2,6 +2,7 @@ import "./ChatInputBar.css";
 
 import { AttributeEditor as CKEditorAttributeEditor, type CKTextEditor, type MentionFeed } from "@triliumnext/ckeditor5";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
+import { Fragment } from "preact";
 
 import { t } from "../../../services/i18n.js";
 import link from "../../../services/link.js";
@@ -128,6 +129,52 @@ export default function ChatInputBar({
     });
 
     const baseSubmit = onSubmit ?? chat.handleSubmit;
+
+    const currentModel = chat.availableModels.find(m => m.id === chat.selectedModel);
+    const isAutoMode = chat.selectedModel === "__auto__";
+    const currentModels = chat.availableModels.filter(m => !m.isLegacy);
+    const legacyModels = chat.availableModels.filter(m => m.isLegacy);
+
+    /** Simple task classifier for auto mode — picks the best model based on input content. */
+    function classifyTask(input: string): string {
+        const text = input.toLowerCase().trim();
+        // Code-related keywords → use the strongest available model
+        const codeKeywords = [
+            "function", "class", "def ", "import ", "export ", "const ", "let ", "var ",
+            "try ", "catch ", "throw", "async ", "await ", "=>", "-->", "```",
+            "bug", "error", "refactor", "debug", "compile", "syntax",
+            "git ", "npm ", "pip ", "docker", "api ", "http ", "sql ",
+            "algorithm", "array", "object", "return ", "if (", "for (", "while ("
+        ];
+        const isCode = codeKeywords.some(kw => text.includes(kw));
+
+        // Very short queries → cheapest model
+        const isShort = text.length < 50;
+
+        // Longer, non-code questions → stronger model
+        const isComplex = text.split(/\s+/).length > 30;
+
+        if (isCode || isComplex) {
+            // Use the most capable model: the one with the largest context window
+            // among available non-legacy models
+            const best = [...chat.availableModels]
+                .filter(m => !m.isLegacy && m.id !== "__auto__")
+                .sort((a, b) => (b.contextWindow || 0) - (a.contextWindow || 0))[0];
+            return best?.id || "big-pickle";
+        }
+
+        if (isShort) {
+            // Find the cheapest model (the one without cost multiplier = free)
+            const cheap = chat.availableModels
+                .filter(m => !m.isLegacy && m.id !== "__auto__" && !m.costMultiplier)
+                .sort((a, b) => (a.contextWindow || 0) - (b.contextWindow || 0))[0];
+            return cheap?.id || chat.availableModels[0]?.id || "big-pickle";
+        }
+
+        // Default: first available model
+        return chat.availableModels.find(m => m.id !== "__auto__")?.id || "big-pickle";
+    }
+
     // Clear the editor immediately when a submit fires with non-empty, non-streaming
     // input — mirrors the rejection check inside chat.handleSubmit so we don't wipe
     // text that won't actually be sent. Doing it here (instead of as a useEffect on
@@ -135,12 +182,17 @@ export default function ChatInputBar({
     // editor visually populated after submit.
     const handleSubmit = useCallback((e: Event) => {
         const willSubmit = (chat.input.trim() || chat.pendingAttachments.length > 0) && !chat.isStreaming;
+        if (willSubmit && isAutoMode) {
+            // Classify the input and auto-select the best model
+            const bestModel = classifyTask(chat.input);
+            chat.setSelectedModel(bestModel);
+        }
         baseSubmit(e);
         if (willSubmit) {
             editorApiRef.current?.setText("");
             editorApiRef.current?.focus();
         }
-    }, [baseSubmit, chat.input, chat.isStreaming, chat.pendingAttachments.length]);
+    }, [baseSubmit, chat.input, chat.isStreaming, chat.pendingAttachments.length, isAutoMode]);
     submitRef.current = handleSubmit;
 
     // Reflect streaming state into CKEditor's read-only lock.
@@ -193,9 +245,6 @@ export default function ChatInputBar({
 
     const isNoteContextEnabled = !!chat.contextNoteId && !!activeNoteId;
 
-    const currentModel = chat.availableModels.find(m => m.id === chat.selectedModel);
-    const currentModels = chat.availableModels.filter(m => !m.isLegacy);
-    const legacyModels = chat.availableModels.filter(m => m.isLegacy);
     // Gemini 2.x cannot combine googleSearch with function tools in a single
     // request. When note tools are enabled on a Gemini model we silently drop
     // web search server-side; reflect that here by disabling the toggle so the
@@ -317,19 +366,66 @@ export default function ChatInputBar({
                 <div className="llm-chat-model-selector">
                     <span className="bx bx-chip" />
                     <Dropdown
-                        text={<>{currentModel?.name}</>}
+                        text={<>{isAutoMode ? "🤖 自动" : currentModel?.providerName ? `${currentModel.providerName} / ${currentModel.name}` : currentModel?.name}</>}
                         disabled={chat.isStreaming}
                         buttonClassName="llm-chat-model-select"
+                        dropdownOptions={{ popperConfig: { placement: 'top-end' } }}
                     >
-                        {currentModels.map(model => (
-                            <FormListItem
-                                key={model.id}
-                                onClick={() => handleModelSelect(model.id)}
-                                checked={chat.selectedModel === model.id}
-                            >
-                                {model.name} <small>({model.costDescription})</small>
-                            </FormListItem>
-                        ))}
+                        {(() => {
+                            // Group current models by provider name
+                            const groups = new Map<string, typeof currentModels>();
+                            // Add "自动" as a virtual provider group at the top
+                            groups.set("🤖 自动", []);
+                            // Show what auto mode would pick (for display)
+                            const autoModel = chat.input ? classifyTask(chat.input) : undefined;
+                            const autoDesc = autoModel
+                                ? chat.availableModels.find(m => m.id === autoModel)?.name || autoModel
+                                : "";
+                            for (const model of currentModels) {
+                                const key = model.providerName || 'Other';
+                                if (!groups.has(key)) groups.set(key, []);
+                                groups.get(key)!.push(model);
+                            }
+                            const entries = Array.from(groups.entries());
+                            return entries.map(([providerName, models], gi) => (
+                                <Fragment key={providerName}>
+                                    {gi > 0 && <FormDropdownDivider />}
+                                    {entries.length > 1 && (
+                                        <div className="dropdown-header" style={{
+                                            padding: '4px 12px',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            color: 'var(--text-weak, #888)',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.5px'
+                                        }}>
+                                            {providerName}
+                                        </div>
+                                    )}
+                                    {models.length === 0 && providerName === "🤖 自动" ? (
+                                        // "自动" mode as a special list item
+                                        <FormListItem
+                                            key="__auto__"
+                                            onClick={() => handleModelSelect("__auto__")}
+                                            checked={isAutoMode}
+                                        >
+                                            🤖 自动
+                                            {autoDesc && <small> → {autoDesc}</small>}
+                                        </FormListItem>
+                                    ) : (
+                                        models.map(model => (
+                                            <FormListItem
+                                                key={model.id}
+                                                onClick={() => handleModelSelect(model.id)}
+                                                checked={chat.selectedModel === model.id}
+                                            >
+                                                {model.name} <small>({model.costDescription})</small>
+                                            </FormListItem>
+                                        ))
+                                    )}
+                                </Fragment>
+                            ));
+                        })()}
                         {legacyModels.length > 0 && (
                             <>
                                 <FormDropdownDivider />

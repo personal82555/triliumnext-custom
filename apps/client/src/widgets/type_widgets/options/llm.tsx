@@ -125,9 +125,30 @@ interface ProviderListProps {
 }
 
 function ProviderList({ providers, onDelete }: ProviderListProps) {
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editName, setEditName] = useState("");
+    const { setProvidersJson } = useTriliumOption("llmProviders");
+
     if (!providers.length) {
         return <div>{t("llm.no_providers_configured")}</div>;
     }
+
+    const handleStartEdit = (provider: LlmProviderConfig) => {
+        setEditingId(provider.id);
+        setEditName(provider.name);
+    };
+
+    const handleSaveEdit = (provider: LlmProviderConfig) => {
+        const updated = providers.map(p =>
+            p.id === provider.id ? { ...p, name: editName.trim() || p.name } : p
+        );
+        setProvidersJson(JSON.stringify(updated));
+        setEditingId(null);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingId(null);
+    };
 
     return (
         <div style={{ overflow: "auto" }}>
@@ -141,12 +162,54 @@ function ProviderList({ providers, onDelete }: ProviderListProps) {
                 </thead>
                 <tbody>
                     {providers.map((provider) => {
-                        const providerType = PROVIDER_TYPES.find(p => p.id === provider.provider);
+                        // Look up a matching preset by name first (for new presets like OpenCode Zen/Go),
+                        // fall back to type-based lookup
+                        let providerTypeName = PROVIDER_TYPES.find(p => p.name === provider.name)?.name;
+                        if (!providerTypeName) {
+                            providerTypeName = PROVIDER_TYPES.find(p => p.id === provider.provider)?.name
+                                || provider.provider === "openai" ? "OpenAI 兼容"
+                                : provider.provider === "anthropic" ? "Anthropic"
+                                : provider.provider === "google" ? "Google Gemini"
+                                : provider.provider;
+                        }
+                        const isEditing = editingId === provider.id;
                         return (
                             <tr key={provider.id}>
-                                <td>{provider.name}</td>
-                                <td>{providerType?.name || provider.provider}</td>
                                 <td>
+                                    {isEditing ? (
+                                        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                                            <input
+                                                type="text"
+                                                className="form-control"
+                                                value={editName}
+                                                onChange={e => setEditName((e.target as HTMLInputElement).value)}
+                                                style={{ width: "160px" }}
+                                                autoFocus
+                                            />
+                                            <ActionButton
+                                                icon="bx bx-check"
+                                                text=""
+                                                onClick={() => handleSaveEdit(provider)}
+                                            />
+                                            <ActionButton
+                                                icon="bx bx-x"
+                                                text=""
+                                                onClick={handleCancelEdit}
+                                            />
+                                        </div>
+                                    ) : (
+                                        provider.name
+                                    )}
+                                </td>
+                                <td>{providerTypeName}</td>
+                                <td>
+                                    {!isEditing && (
+                                        <ActionButton
+                                            icon="bx bx-pencil"
+                                            text="重命名"
+                                            onClick={() => handleStartEdit(provider)}
+                                        />
+                                    )}
                                     <ActionButton
                                         icon="bx bx-trash"
                                         text={t("llm.delete_provider")}

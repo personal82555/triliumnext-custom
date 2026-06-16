@@ -83,15 +83,17 @@ async function register(app: express.Application) {
             // broken when closing the browser and coming back in to the page.
             // The page is restored from cache, but the API call fail.
             res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+            res.setHeader("Pragma", "no-cache");
+            res.setHeader("Expires", "0");
             res.sendFile(path.join(publicDir, "index.html"), STATIC_OPTIONS);
         });
         app.use("/assets", persistentCacheStatic(path.join(publicDir, "assets")));
-        app.use(`/src`, persistentCacheStatic(path.join(publicDir, "src")));
-        app.use(`/${assetUrlFragment}/src`, persistentCacheStatic(path.join(publicDir, "src")));
-        app.use(`/${assetUrlFragment}/stylesheets`, persistentCacheStatic(path.join(publicDir, "stylesheets")));
-        app.use(`/${assetUrlFragment}/fonts`, persistentCacheStatic(path.join(publicDir, "fonts")));
-        app.use(`/${assetUrlFragment}/translations/`, persistentCacheStatic(path.join(publicDir, "translations")));
-        app.use(`/node_modules/`, persistentCacheStatic(path.join(publicDir, "node_modules")));
+        app.use(`/src`, persistentCacheStatic(path.join(publicDir, "src"), { maxAge: "5m" }));
+        app.use(`/${assetUrlFragment}/src`, persistentCacheStatic(path.join(publicDir, "src"), { maxAge: "5m" }));
+        app.use(`/${assetUrlFragment}/stylesheets`, persistentCacheStatic(path.join(publicDir, "stylesheets"), { maxAge: "5m" }));
+        app.use(`/${assetUrlFragment}/fonts`, persistentCacheStatic(path.join(publicDir, "fonts"), { maxAge: "5m" }));
+        app.use(`/${assetUrlFragment}/translations/`, persistentCacheStatic(path.join(publicDir, "translations"), { maxAge: "5m" }));
+        app.use(`/node_modules/`, persistentCacheStatic(path.join(publicDir, "node_modules"), { maxAge: "5m" }));
     }
     app.use(`/share/assets/fonts/`, express.static(path.join(getClientDir(), "fonts"), STATIC_OPTIONS));
     app.use(`/share/assets/`, express.static(getShareThemeAssetDir(), STATIC_OPTIONS));

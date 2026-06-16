@@ -43,6 +43,7 @@ function flattenToApiContent(content: string | ContentBlock[]): string | LlmMess
 
 export interface ModelOption extends LlmModelInfo {
     costDescription?: string;
+    providerName?: string;
 }
 
 export interface LlmChatOptions {

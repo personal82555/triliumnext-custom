@@ -2,7 +2,7 @@ import { getLog, options as optionService } from "@triliumnext/core";
 
 import { AnthropicProvider } from "./providers/anthropic.js";
 import { GoogleProvider } from "./providers/google.js";
-import { OpenAiProvider } from "./providers/openai.js";
+import { OpenAiProvider, type CustomModelDef } from "./providers/openai.js";
 import type { LlmProvider, ModelInfo } from "./types.js";
 
 /**
@@ -16,12 +16,14 @@ export interface LlmProviderSetup {
     apiKey: string;
     /** Optional override for the SDK's default API endpoint (e.g. for self-hosted Ollama, vLLM, or proxies). */
     baseURL?: string;
+    /** Optional custom model list for OpenAI-compatible providers */
+    models?: CustomModelDef[];
 }
 
 /** Factory functions for creating provider instances */
-const providerFactories: Record<string, (apiKey: string, baseURL?: string) => LlmProvider> = {
+const providerFactories: Record<string, (apiKey: string, baseURL?: string, setup?: LlmProviderSetup) => LlmProvider> = {
     anthropic: (apiKey, baseURL) => new AnthropicProvider(apiKey, baseURL),
-    openai: (apiKey, baseURL) => new OpenAiProvider(apiKey, baseURL),
+    openai: (apiKey, baseURL, setup) => new OpenAiProvider(apiKey, baseURL, setup?.models),
     google: (apiKey, baseURL) => new GoogleProvider(apiKey, baseURL)
 };
 
@@ -31,7 +33,7 @@ let cachedProviders: Record<string, LlmProvider> = {};
 /**
  * Get configured providers from the options.
  */
-function getConfiguredProviders(): LlmProviderSetup[] {
+export function getConfiguredProviders(): LlmProviderSetup[] {
     try {
         const providersJson = optionService.getOptionOrNull("llmProviders");
         if (!providersJson) {
@@ -75,7 +77,7 @@ export function getProvider(providerId?: string): LlmProvider {
         throw new Error(`Unknown LLM provider type: ${config.provider}. Available: ${Object.keys(providerFactories).join(", ")}`);
     }
 
-    const provider = factory(config.apiKey, config.baseURL);
+    const provider = factory(config.apiKey, config.baseURL, config);
     cachedProviders[config.id] = provider;
     return provider;
 }
@@ -102,25 +104,91 @@ export function hasConfiguredProviders(): boolean {
 }
 
 /**
+ * Derive a human-readable provider label from the config, preferring the
+ * user-supplied name when it's not the generic type name, otherwise falling
+ * back to a friendy name based on the base URL hostname.
+ */
+function deriveProviderLabel(config: LlmProviderSetup): string {
+    // If the user set a custom name that isn't just the type default, use it
+    const typeNames = ["Anthropic", "OpenAI", "Google Gemini", "OpenAI 兼容", "自定义 OpenAI 兼容"];
+    if (config.name && !typeNames.includes(config.name)) {
+        return config.name;
+    }
+
+    // Fall back to a nice name from the base URL hostname
+    if (config.baseURL) {
+        try {
+            const url = new URL(config.baseURL);
+            const hostname = url.hostname;
+            const pathname = url.pathname;
+            // Known mappings — check hostname + path first, then hostname-only
+            const known: Record<string, string> = {
+                "api.openai.com": "OpenAI",
+                "api.anthropic.com": "Anthropic",
+                "generativelanguage.googleapis.com": "Google Gemini",
+                "api.deepseek.com": "DeepSeek",
+                "openrouter.ai": "OpenRouter",
+                "api.groq.com": "Groq",
+                "api.together.xyz": "Together AI",
+                "api.mistral.ai": "Mistral AI",
+                "api.perplexity.ai": "Perplexity",
+                "api.x.ai": "xAI (Grok)",
+                "api.fireworks.ai": "Fireworks AI",
+                "api.cohere.ai": "Cohere",
+            };
+            // Path-specific OpenCode mappings (check before generic hostname match)
+            if (hostname === "opencode.ai" || hostname.endsWith(".opencode.ai")) {
+                if (pathname.startsWith("/zen/go/")) return "OpenCode Go";
+                if (pathname.startsWith("/zen/")) return "OpenCode Zen";
+                return "OpenCode"; // fallback if path is unknown
+            }
+            for (const [pattern, label] of Object.entries(known)) {
+                if (hostname === pattern || hostname.endsWith("." + pattern)) {
+                    return label;
+                }
+            }
+            // Local / self-hosted — friendly short names
+            if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
+                const port = new URL(config.baseURL).port;
+                if (port === "11434") return "Ollama";
+                if (port === "8000") return "vLLM";
+                return `本地 (端口 ${port})`;
+            }
+            // Unknown hostname: show just the main domain segment
+            const parts = hostname.replace(/^api\./, "").replace(/^www\./, "").split(".");
+            return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+        } catch {
+            // Invalid URL — fall through
+        }
+    }
+
+    return config.provider.charAt(0).toUpperCase() + config.provider.slice(1);
+}
+
+/**
  * Get all models from all configured providers, tagged with their provider type.
  */
 export function getAllModels(): ModelInfo[] {
     const configs = getConfiguredProviders();
-    const seenProviderTypes = new Set<string>();
     const allModels: ModelInfo[] = [];
+    let firstModel = true;
 
     for (const config of configs) {
-        // Only include models once per provider type (not per config instance)
-        if (seenProviderTypes.has(config.provider)) {
-            continue;
-        }
-        seenProviderTypes.add(config.provider);
-
         try {
             const provider = getProvider(config.id);
             const models = provider.getAvailableModels();
+            const providerLabel = deriveProviderLabel(config);
             for (const model of models) {
-                allModels.push({ ...model, provider: config.provider });
+                // Only the very first model across all providers is the default
+                allModels.push({
+                    ...model,
+                    isDefault: firstModel,
+                    provider: config.id,
+                    // Store the human-readable provider name for display
+                    // so the client can show it as a group header and prefix.
+                    providerName: providerLabel
+                } as ModelInfo & { providerName: string });
+                firstModel = false;
             }
         } catch (e) {
             getLog().error(`Failed to get models from provider ${config.provider}: ${e}`);

@@ -75,31 +75,31 @@ function useItems(rightPaneVisible: boolean, widgetsByParent: WidgetsByParent) {
     if (!rightPaneVisible) return [];
     const definitions: RightPanelWidgetDefinition[] = [
         {
-            el: <TableOfContents />,
+            el: <TableOfContents key="right-pane-toc" />,
             enabled: (noteType === "text" || noteType === "doc" || isPdf || !!note?.isMarkdown()),
         },
         {
-            el: <PdfPages />,
+            el: <PdfPages key="right-pane-pdf-pages" />,
             enabled: isPdf,
         },
         {
-            el: <PdfAttachments />,
+            el: <PdfAttachments key="right-pane-pdf-attachments" />,
             enabled: isPdf,
         },
         {
-            el: <PdfLayers />,
+            el: <PdfLayers key="right-pane-pdf-layers" />,
             enabled: isPdf,
         },
         {
-            el: <PdfAnnotations />,
+            el: <PdfAnnotations key="right-pane-pdf-annotations" />,
             enabled: isPdf,
         },
         {
-            el: <HighlightsList />,
+            el: <HighlightsList key="right-pane-highlights" />,
             enabled: noteType === "text" && highlightsList.length > 0,
         },
         {
-            el: <SidebarChat />,
+            el: <SidebarChat key="sidebar-chat" />,
             enabled: noteType !== "llmChat" && isExperimentalFeatureEnabled("llm"),
             position: 1000
         },
@@ -108,10 +108,10 @@ function useItems(rightPaneVisible: boolean, widgetsByParent: WidgetsByParent) {
             enabled: true,
             position: widget.position
         })),
-        ...widgetsByParent.getPreactWidgets("right-pane").map((widget) => {
+        ...widgetsByParent.getPreactWidgets("right-pane").map((widget, idx) => {
             const El = widget.render;
             return {
-                el: <El />,
+                el: <El key={`right-pane-custom-preact-${idx}`} />,
                 enabled: true,
                 position: widget.position
             };
@@ -139,11 +139,12 @@ function useSplit(visible: boolean) {
         if (!visible) return;
 
         // We are intentionally omitting useTriliumOption to avoid re-render due to size change.
-        const rightPaneWidth = Math.max(MIN_WIDTH_PERCENT, options.getInt("rightPaneWidth") ?? MIN_WIDTH_PERCENT);
+        const savedWidth = options.getInt("rightPaneWidth");
+        const rightPaneWidth = Math.max(MIN_WIDTH_PERCENT, savedWidth || 30);
         const splitInstance = Split(["#center-pane", "#right-pane"], {
             sizes: [100 - rightPaneWidth, rightPaneWidth],
             gutterSize: DEFAULT_GUTTER_SIZE,
-            minSize: [300, 180],
+            minSize: [200, 180],
             rtl: glob.isRtl,
             onDragEnd: (sizes) => options.save("rightPaneWidth", Math.round(sizes[1]))
         });

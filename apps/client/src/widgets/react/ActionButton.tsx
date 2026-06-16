@@ -40,6 +40,7 @@ export default function ActionButton({ text, icon, className, triggerCommand, ti
 
     return <button
         ref={buttonRef}
+        type="button"
         class={`${className ?? ""} ${!noIconActionClass ? "icon-action" : "btn"} ${icon} ${frame ? "btn btn-primary" : ""} ${disabled ? "disabled" : ""} ${active ? "active" : ""}`}
         data-trigger-command={triggerCommand}
         disabled={disabled}

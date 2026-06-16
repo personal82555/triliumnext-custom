@@ -70,7 +70,7 @@ function setupRightPaneResizer() {
         return;
     }
 
-    rightPaneWidth = rightPaneWidth ?? (options.getInt("rightPaneWidth") ?? 0);
+    rightPaneWidth = rightPaneWidth ?? (options.getInt("rightPaneWidth") || 30);
     if (!rightPaneWidth || rightPaneWidth < 5) {
         rightPaneWidth = 5;
     }
@@ -79,7 +79,7 @@ function setupRightPaneResizer() {
         rightInstance = Split(["#center-pane", "#right-pane"], {
             sizes: [100 - rightPaneWidth, rightPaneWidth],
             gutterSize: DEFAULT_GUTTER_SIZE,
-            minSize: [300, 180],
+            minSize: [200, 180],
             rtl: glob.isRtl,
             onDragEnd: (sizes) => {
                 rightPaneWidth = Math.round(sizes[1]);

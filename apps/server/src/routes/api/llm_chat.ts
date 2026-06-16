@@ -2,7 +2,7 @@ import type { LlmMessage } from "@triliumnext/commons";
 import type { Request, Response } from "express";
 
 import { generateChatTitle } from "../../services/llm/chat_title.js";
-import { getAllModels, getProviderByType, hasConfiguredProviders, type LlmProviderConfig } from "../../services/llm/index.js";
+import { getAllModels, getProvider, hasConfiguredProviders, type LlmProviderConfig, getConfiguredProviders } from "../../services/llm/index.js";
 import { streamToChunks } from "../../services/llm/stream.js";
 import { getLog } from "@triliumnext/core";
 import { safeExtractMessageAndStackFromError } from "../../services/utils.js";
@@ -50,28 +50,71 @@ async function streamChat(req: Request, res: Response) {
             return;
         }
 
-        const provider = getProviderByType(config.provider || "anthropic");
-        const result = provider.chat(messages, config);
-
-        // Get pricing and display name for the model
-        const modelId = config.model || provider.getAvailableModels().find(m => m.isDefault)?.id;
-        if (!modelId) {
-            res.write(`data: ${JSON.stringify({ type: "error", error: "No model specified and no default model available for the provider." })}\n\n`);
-            return;
+        const errors: string[] = [];
+        // Collect all provider config IDs in fallback order
+        const allConfigs = getConfiguredProviders();
+        const fallbackProviderIds = allConfigs.map(c => c.id);
+        // Primary is the one matching the selected model's provider, or first
+        let primaryProviderId = config.provider;
+        if (!primaryProviderId || !fallbackProviderIds.includes(primaryProviderId)) {
+            primaryProviderId = allConfigs[0]?.id;
         }
 
-        const pricing = provider.getModelPricing(modelId);
-        const modelDisplayName = provider.getAvailableModels().find(m => m.id === modelId)?.name || modelId;
-        for await (const chunk of streamToChunks(result, { model: modelDisplayName, pricing })) {
-            if (chunk.type === "error") {
-                getLog().error(`LLM chat stream error (model ${modelDisplayName}): ${chunk.error}`);
-            }
-            res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-            // Flush immediately to ensure real-time streaming
-            if (typeof flushableRes.flush === "function") {
-                flushableRes.flush();
+        // Try providers in order until one succeeds
+        const providerQueue = [primaryProviderId, ...fallbackProviderIds.filter(id => id !== primaryProviderId)];
+
+        let lastError: unknown;
+        let usedProvider: string | undefined;
+
+        for (const pid of providerQueue) {
+            try {
+                usedProvider = pid;
+                const provider = getProvider(pid);
+                const result = provider.chat(messages, { ...config, provider: pid });
+
+                // Get pricing and display name for the model
+                const modelId = config.model || provider.getAvailableModels().find(m => m.isDefault)?.id;
+                if (!modelId) {
+                    res.write(`data: ${JSON.stringify({ type: "error", error: "No model specified and no default model available for the provider." })}\n\n`);
+                    return;
+                }
+
+                const pricing = provider.getModelPricing(modelId);
+                const modelDisplayName = provider.getAvailableModels().find(m => m.id === modelId)?.name || modelId;
+
+                // If this is a fallback (not the primary), tell the user
+                if (pid !== primaryProviderId) {
+                    const fallbackName = allConfigs.find(c => c.id === pid)?.name || pid;
+                    res.write(`data: ${JSON.stringify({ type: "info", content: `⚠️ Primary provider failed, using ${fallbackName} as fallback.` })}\n\n`);
+                }
+
+                for await (const chunk of streamToChunks(result, { model: modelDisplayName, pricing })) {
+                    if (chunk.type === "error") {
+                        getLog().error(`LLM chat stream error (model ${modelDisplayName}): ${chunk.error}`);
+                    }
+                    res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+                    if (typeof flushableRes.flush === "function") {
+                        flushableRes.flush();
+                    }
+                }
+
+                // Success — exit the fallback loop
+                lastError = undefined;
+                break;
+            } catch (error) {
+                lastError = error;
+                const errMsg = error instanceof Error ? error.message : "Unknown error";
+                errors.push(errMsg);
+                getLog().warn(`Provider ${pid} failed, trying next: ${errMsg}`);
+                // Continue to next provider in queue
             }
         }
+
+        if (lastError) {
+            // All providers failed
+            res.write(`data: ${JSON.stringify({ type: "error", error: `All providers failed:\n${errors.join("\n")}` })}\n\n`);
+        }
+
         // Auto-generate a title for the chat note on the first user message
         const userMessages = messages.filter(m => m.role === "user");
         if (userMessages.length === 1 && config.chatNoteId) {

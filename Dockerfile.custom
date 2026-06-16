@@ -1,0 +1,30 @@
+FROM node:24.16.0-bullseye-slim AS rebuild
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Rebuild better-sqlite3 from source
+WORKDIR /build
+COPY apps/server/dist/node_modules/better-sqlite3 /build/better-sqlite3
+WORKDIR /build/better-sqlite3
+RUN ls && npm run build-release 2>&1 || true
+
+# Final stage
+FROM node:24.16.0-bullseye-slim
+
+WORKDIR /usr/src/app
+
+# Copy dist without better-sqlite3
+COPY apps/server/dist /usr/src/app
+RUN rm -rf /usr/src/app/node_modules/better-sqlite3
+
+# Copy rebuilt better-sqlite3
+COPY --from=rebuild /build/better-sqlite3 /usr/src/app/node_modules/better-sqlite3
+
+EXPOSE 8080
+CMD [ "node", "./main.cjs" ]
