@@ -1,270 +1,223 @@
 <div align="center">
-	<sup>Special thanks to:</sup><br />
-	<a href="https://go.warp.dev/Trilium" target="_blank">		
-		<img alt="Warp sponsorship" width="400" src="https://github.com/warpdotdev/brand-assets/blob/main/Github/Sponsor/Warp-Github-LG-03.png"><br />
-		Warp, built for coding with multiple AI agents<br />
-	</a>
-  <sup>Available for macOS, Linux and Windows</sup>
+
+# TriliumNext Custom
+
+**基于 TriliumNext v0.103.0 的自定义版本**
+增强 AI/LLM 集成 + 自媒体发布引擎 + Lsky Pro 图床
+
+[![GitHub Stars](https://img.shields.io/github/stars/personal82555/triliumnext-custom)](https://github.com/personal82555/triliumnext-custom)
+[![License](https://img.shields.io/github/license/personal82555/triliumnext-custom)](LICENSE)
+
 </div>
 
-<hr />
+---
 
-# Trilium Notes
+## ✨ 自定义功能
 
-![GitHub Sponsors](https://img.shields.io/github/sponsors/eliandoran) ![LiberaPay patrons](https://img.shields.io/liberapay/patrons/ElianDoran)  
-![Docker Pulls](https://img.shields.io/docker/pulls/triliumnext/trilium)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/triliumnext/trilium/total)  
-[![Translation status](https://hosted.weblate.org/widget/trilium/svg-badge.svg)](https://hosted.weblate.org/engage/trilium/)
+本仓库基于 [TriliumNext](https://github.com/TriliumNext/Trilium) v0.103.0 进行了以下功能增强：
 
-<!-- translate:off -->
-<!-- LANGUAGE SWITCHER -->
-[Arabic](./docs/README-ar.md) | [Chinese (Simplified Han script)](./docs/README-ZH_CN.md) | [Chinese (Traditional Han script)](./docs/README-ZH_TW.md) | [Czech](./docs/README-cs.md) | [English (United Kingdom)](./docs/README-en_GB.md) | [English](./docs/README.md) | [French](./docs/README-fr.md) | [German](./docs/README-de.md) | [Greek](./docs/README-el.md) | [Irish](./docs/README-ga.md) | [Italian](./docs/README-it.md) | [Japanese](./docs/README-ja.md) | [Korean](./docs/README-ko.md) | [Polish](./docs/README-pl.md) | [Romanian](./docs/README-ro.md) | [Russian](./docs/README-ru.md) | [Spanish](./docs/README-es.md) | [Ukrainian](./docs/README-uk.md) | [Uyghur](./docs/README-ug.md)
-<!-- translate:on -->
+### 🤖 AI/LLM 集成增强
 
-Trilium Notes is a free and open-source, cross-platform hierarchical note taking application with focus on building large personal knowledge bases.
+| 功能 | 说明 |
+|------|------|
+| **自定义 Provider** | 支持配置任意 OpenAI 兼容接口（自定义 Base URL + API Key + 模型名） |
+| **多 Provider 切换** | 侧边栏聊天支持在不同 LLM Provider 之间切换 |
+| **流式响应** | ChatInputBar 支持流式输出，实时显示生成内容 |
+| **Provider 管理界面** | 可视化配置页面，支持新增/编辑/删除自定义 Provider |
+| **兼容性** | 兼容 OpenAI、Anthropic、本地 Ollama、new-api 等 OpenAI 格式接口 |
 
-<img src="./docs/app.png" alt="Trilium Screenshot" width="1000">
+**修改文件：**
+- `apps/client/src/widgets/type_widgets/options/llm/AddProviderModal.tsx` — Provider 配置弹窗
+- `apps/client/src/widgets/type_widgets/options/llm.tsx` — LLM 选项页
+- `apps/client/src/widgets/type_widgets/llm_chat/ChatInputBar.tsx` — 输入栏增强
+- `apps/client/src/widgets/sidebar/SidebarChat.tsx` — 侧边栏聊天重构
+- `apps/server/src/routes/api/llm_chat.ts` — 服务端多 Provider 路由
+- `apps/server/src/services/llm/index.ts` — LLM 服务核心
+- `apps/server/src/services/llm/providers/openai.ts` — OpenAI 兼容 Provider
 
-## ⏬ Download
-- [Latest release](https://github.com/TriliumNext/Trilium/releases/latest) – stable version, recommended for most users.
-- [Nightly build](https://github.com/TriliumNext/Trilium/releases/tag/nightly) – unstable development version, updated daily with the latest features and fixes.
+---
 
-## 📚 Documentation
+### 📰 自媒体发布引擎
 
-**Visit our comprehensive documentation at [docs.triliumnotes.org](https://docs.triliumnotes.org/)**
+一键将笔记发布到多个自媒体平台：
 
-Our documentation is available in multiple formats:
-- **Online Documentation**: Browse the full documentation at [docs.triliumnotes.org](https://docs.triliumnotes.org/)
-- **In-App Help**: Press `F1` within Trilium to access the same documentation directly in the application
-- **GitHub**: Navigate through the [User Guide](./docs/User%20Guide/User%20Guide/) in this repository
+| 平台 | 状态 | 说明 |
+|------|------|------|
+| **WordPress** | ✅ 已实现 | 支持 REST API 发布，自定义分类/标签 |
+| **微信公众号** | ✅ 已实现 | 通过 WechatSync Bridge 发布 |
+| **Article 笔记类型** | ✅ 已实现 | 专用文章编辑器，带浮动发布按钮 |
 
-### Quick Links
-- [Getting Started Guide](https://docs.triliumnotes.org/)
-- [Installation Instructions](https://docs.triliumnotes.org/user-guide/setup)
-- [Docker Setup](https://docs.triliumnotes.org/user-guide/setup/server/installation/docker)
-- [Upgrading TriliumNext](https://docs.triliumnotes.org/user-guide/setup/upgrading)
-- [Basic Concepts and Features](https://docs.triliumnotes.org/user-guide/concepts/notes)
-- [Patterns of Personal Knowledge Base](https://docs.triliumnotes.org/user-guide/misc/patterns-of-personal-knowledge)
+**核心模块：**
+```
+apps/server/src/services/publisher/
+├── types.ts          # 发布类型定义
+├── core.ts           # 发布引擎核心
+├── wordpress.ts      # WordPress 适配器
+└── wechat.ts         # 微信公众号适配器
+```
 
-## 🎁 Features
+**ETAPI 端点：**
+- `POST /etapi/publishing/publish` — 发布文章到指定平台
+- `GET /etapi/publishing/platforms` — 获取已配置的平台列表
+- `POST /etapi/publishing/test` — 测试平台连接
 
-* Notes can be arranged into arbitrarily deep tree. Single note can be placed into multiple places in the tree (see [cloning](https://docs.triliumnotes.org/user-guide/concepts/notes/cloning))
-* Rich WYSIWYG note editor including e.g. tables, images and [math](https://docs.triliumnotes.org/user-guide/note-types/text) with markdown [autoformat](https://docs.triliumnotes.org/user-guide/note-types/text/markdown-formatting)
-* Support for editing [notes with source code](https://docs.triliumnotes.org/user-guide/note-types/code), including syntax highlighting
-* Fast and easy [navigation between notes](https://docs.triliumnotes.org/user-guide/concepts/navigation/note-navigation), full text search and [note hoisting](https://docs.triliumnotes.org/user-guide/concepts/navigation/note-hoisting)
-* Seamless [note versioning](https://docs.triliumnotes.org/user-guide/concepts/notes/note-revisions)
-* Note [attributes](https://docs.triliumnotes.org/user-guide/advanced-usage/attributes) can be used for note organization, querying and advanced [scripting](https://docs.triliumnotes.org/user-guide/scripts)
-* UI available in English, German, Spanish, French, Romanian, and Chinese (simplified and traditional)
-* Direct [OpenID and TOTP integration](https://docs.triliumnotes.org/user-guide/setup/server/mfa) for more secure login
-* [Synchronization](https://docs.triliumnotes.org/user-guide/setup/synchronization) with self-hosted sync server
-  * there are [3rd party services for hosting synchronisation server](https://docs.triliumnotes.org/user-guide/setup/server/cloud-hosting)
-* [Sharing](https://docs.triliumnotes.org/user-guide/advanced-usage/sharing) (publishing) notes to public internet
-* Strong [note encryption](https://docs.triliumnotes.org/user-guide/concepts/notes/protected-notes) with per-note granularity
-* Sketching diagrams, based on [Excalidraw](https://excalidraw.com/) (note type "canvas")
-* [Relation maps](https://docs.triliumnotes.org/user-guide/note-types/relation-map) and [note/link maps](https://docs.triliumnotes.org/user-guide/note-types/note-map) for visualizing notes and their relations
-* Mind maps, based on [Mind Elixir](https://docs.mind-elixir.com/)
-* [Geo maps](https://docs.triliumnotes.org/user-guide/collections/geomap) with location pins and GPX tracks
-* [Scripting](https://docs.triliumnotes.org/user-guide/scripts) - see [Advanced showcases](https://docs.triliumnotes.org/user-guide/advanced-usage/advanced-showcases)
-* [REST API](https://docs.triliumnotes.org/user-guide/advanced-usage/etapi) for automation
-* Scales well in both usability and performance upwards of 100 000 notes
-* Touch optimized [mobile frontend](https://docs.triliumnotes.org/user-guide/setup/mobile-frontend) for smartphones and tablets
-* Built-in [dark theme](https://docs.triliumnotes.org/user-guide/concepts/themes), support for user themes
-* [Evernote](https://docs.triliumnotes.org/user-guide/concepts/import-export/evernote) and [Markdown import & export](https://docs.triliumnotes.org/user-guide/concepts/import-export/markdown)
-* [Web Clipper](https://docs.triliumnotes.org/user-guide/setup/web-clipper) for easy saving of web content
-* Customizable UI (sidebar buttons, user-defined widgets, ...)
-* [Metrics](https://docs.triliumnotes.org/user-guide/advanced-usage/metrics), along with a Grafana Dashboard.
+---
 
-✨ Check out the following third-party resources/communities for more TriliumNext related goodies:
+### 🖼️ Lsky Pro 图床集成
 
-- [awesome-trilium](https://github.com/Nriver/awesome-trilium) for 3rd party themes, scripts, plugins and more.
-- [TriliumRocks!](https://trilium.rocks/) for tutorials, guides, and much more.
+笔记中的图片自动上传到自建 Lsky Pro 图床：
 
-## ❓Why TriliumNext?
+| 功能 | 说明 |
+|------|------|
+| **自动上传** | 粘贴/拖拽图片时自动上传到 Lsky Pro |
+| **相册归类** | 支持 `albumId` 参数，图片自动归入指定相册 |
+| **策略选择** | 支持配置上传策略（`strategy_id`） |
+| **公网域名** | 支持配置自定义公网访问域名 |
+| **ETAPI 管理** | 通过 ETAPI 端点管理图床配置和测试连接 |
 
-The original Trilium developer ([Zadam](https://github.com/zadam)) has graciously given the Trilium repository to the community project which resides at https://github.com/TriliumNext
+**设置选项（前端 UI 可配置）：**
+- `lskyApiUrl` — Lsky Pro API 地址
+- `lskyToken` — API Token
+- `lskyStrategyId` — 上传策略 ID
+- `lskyAlbumId` — 目标相册 ID（新增）
+- `lskyPublicDomain` — 公网访问域名
+- `lskyEnabled` — 启用/禁用开关
 
-### ⬆️Migrating from Zadam/Trilium?
+**ETAPI 端点：**
+- `GET /etapi/media/config` — 获取图床配置状态
+- `POST /etapi/media/save-config` — 保存图床配置
+- `POST /etapi/media/test` — 测试图床连接
+- `POST /etapi/media/upload` — 上传图片
+- `POST /etapi/media/upload-url` — 通过 URL 上传图片
 
-There are no special migration steps to migrate from a zadam/Trilium instance to a TriliumNext/Trilium instance. Simply [install TriliumNext/Trilium](#-installation) as usual and it will use your existing database.
+---
 
-Versions up to and including [v0.90.4](https://github.com/TriliumNext/Trilium/releases/tag/v0.90.4) are compatible with the latest zadam/trilium version of [v0.63.7](https://github.com/zadam/trilium/releases/tag/v0.63.7). Any later versions of TriliumNext/Trilium have their sync versions incremented which prevents direct migration.
+### 📝 Article 笔记类型
 
-## 💬 Discuss with us
+新增专用文章编辑器，支持自媒体内容创作：
 
-Feel free to join our official conversations. We would love to hear what features, suggestions, or issues you may have!
+- **富文本编辑** — 基于 ProseMirror 的 WYSIWYG 编辑器
+- **浮动发布按钮** — 编辑界面右下角一键发布
+- **封面图设置** — 支持设置文章封面图
+- **平台适配** — 自动适配各平台格式要求
 
-- [Matrix](https://matrix.to/#/#triliumnext:matrix.org) (For synchronous discussions.)
-  - The `General` Matrix room is also bridged to [XMPP](xmpp:discuss@trilium.thisgreat.party?join)
-- [Github Discussions](https://github.com/TriliumNext/Trilium/discussions) (For asynchronous discussions.)
-- [Github Issues](https://github.com/TriliumNext/Trilium/issues) (For bug reports and feature requests.)
+---
 
-## 🏗 Installation
+## 🔧 技术栈
 
-### Windows / MacOS
+- **前端**：TypeScript + React + ProseMirror
+- **后端**：TypeScript + Express + SQLite
+- **构建**：pnpm + esbuild
+- **图床**：Lsky Pro（兰空图床）
+- **发布**：WechatSync Bridge + WordPress REST API
 
-Download the binary release for your platform from the [latest release page](https://github.com/TriliumNext/Trilium/releases/latest), unzip the package and run the `trilium` executable.
+---
 
-### Linux
+## 🚀 快速开始
 
-If your distribution is listed in the table below, use your distribution's package.
+### 1. 克隆仓库
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/trilium.svg)](https://repology.org/project/trilium/versions)
+```bash
+git clone https://github.com/personal82555/triliumnext-custom.git
+cd triliumnext-custom
+```
 
-You may also download the binary release for your platform from the [latest release page](https://github.com/TriliumNext/Trilium/releases/latest), unzip the package and run the `trilium` executable.
+### 2. 安装依赖
 
-TriliumNext is also provided as a Flatpak, but not yet published on FlatHub.
-
-### Browser (any OS)
-
-If you use a server installation (see below), you can directly access the web interface (which is almost identical to the desktop app).
-
-Currently only the latest versions of Chrome & Firefox are supported (and tested).
-
-### Mobile
-
-To use TriliumNext on a mobile device, you can use a mobile web browser to access the mobile interface of a server installation (see below).
-
-See issue https://github.com/TriliumNext/Trilium/issues/4962 for more information on mobile app support.
-
-#### TriliumDroid
-
-If you prefer a native Android app, you can use [TriliumDroid](https://apt.izzysoft.de/fdroid/index/apk/eu.fliegendewurst.triliumdroid).
-Report bugs and missing features at [their repository](https://github.com/FliegendeWurst/TriliumDroid).
-Note: It is best to disable automatic updates on your server installation (see below) when using TriliumDroid since the sync version must match between Trilium and TriliumDroid.
-
-#### Pocket Trilium
-
-If you want a full-featured native Android app, check out [Pocket Trilium](https://github.com/Nriver/pocket-trilium).
-It runs a complete Trilium instance on your phone, supports full offline use, and allows you to sync with your server.
-
-#### Trinote
-
-If you want a native iOS app, you can use [Trinote](https://apps.apple.com/us/app/trinote/id6761228249), an open-source client for your self-hosted Trilium / TriliumNext server.
-It lets you browse and organize your note tree, search for notes on the server, read and edit all note types (text, code, mindmap, spreadsheet, geomap, canvas, etc.), and keeps notes available and editable offline.
-Here's the [repo](https://github.com/StephenArg/Trinote) if you're interested in contributing and here's the [discord](https://discord.com/invite/ghjJG56EUS) server if you have any feedback or suggestions you want to discuss.
-
-### Server
-
-To install TriliumNext on your own server (including via Docker from [Dockerhub](https://hub.docker.com/r/triliumnext/trilium)) follow [the server installation docs](https://docs.triliumnotes.org/user-guide/setup/server).
-
-
-## 💻 Contribute
-
-### Translations
-
-If you are a native speaker, help us translate Trilium by heading over to our [Weblate page](https://hosted.weblate.org/engage/trilium/).
-
-Here's the language coverage we have so far:
-
-[![Translation status](https://hosted.weblate.org/widget/trilium/multi-auto.svg)](https://hosted.weblate.org/engage/trilium/)
-
-### Code
-
-Download the repository, install dependencies using `pnpm` and then run the server (available at http://localhost:8080):
-```shell
-git clone https://github.com/TriliumNext/Trilium.git
-cd Trilium
+```bash
 pnpm install
-pnpm run server:start
 ```
 
-### Documentation
+### 3. 构建
 
-Download the repository, install dependencies using `pnpm` and then run the environment required to edit the documentation:
-```shell
-git clone https://github.com/TriliumNext/Trilium.git
-cd Trilium
-pnpm install
-pnpm edit-docs:edit-docs
+```bash
+cd apps/server
+pnpm server:build
 ```
 
-Alternatively, if you have Nix installed:
-```shell
-# Run directly
-nix run .#edit-docs
+### 4. 配置环境变量
 
-# Or install to your profile
-nix profile install .#edit-docs
-trilium-edit-docs
+创建 `.env.lsky` 文件：
+
+```bash
+LSKY_API_URL=http://your-lsky-host:8089
+LSKY_TOKEN=your-api-token
+LSKY_STRATEGY_ID=1
+LSKY_ALBUM_ID=1
+LSKY_PUBLIC_DOMAIN=https://img.your-domain.com
+LSKY_ENABLED=true
 ```
 
+### 5. 启动服务
 
-### Building the Executable
-Download the repository, install dependencies using `pnpm` and then build the desktop app for Windows:
-```shell
-git clone https://github.com/TriliumNext/Trilium.git
-cd Trilium
-pnpm install
-pnpm run --filter desktop electron-forge:make --arch=x64 --platform=win32
+```bash
+TRILIUM_ENV=production \
+TRILIUM_DATA_DIR=/path/to/data \
+TRILIUM_PORT=8083 \
+node dist/main.cjs
 ```
 
-For more details, see the [development docs](https://github.com/TriliumNext/Trilium/tree/main/docs/Developer%20Guide/Developer%20Guide).
+---
 
-### Developer Documentation
+## 📁 项目结构
 
-Please view the [documentation guide](https://github.com/TriliumNext/Trilium/blob/main/docs/Developer%20Guide/Developer%20Guide/Environment%20Setup.md) for details. If you have more questions, feel free to reach out via the links described in the "Discuss with us" section above.
+```
+triliumnext-custom/
+├── apps/
+│   ├── client/src/
+│   │   ├── widgets/
+│   │   │   ├── type_widgets/
+│   │   │   │   ├── article/           # Article 笔记类型
+│   │   │   │   ├── llm_chat/          # LLM 聊天组件
+│   │   │   │   └── options/llm/       # LLM 配置界面
+│   │   │   └── sidebar/
+│   │   │       └── SidebarChat.tsx    # 侧边栏聊天
+│   │   └── services/
+│   │       └── note_types.ts          # 笔记类型注册
+│   └── server/src/
+│       ├── etapi/
+│       │   ├── media.ts               # 图床 ETAPI 端点
+│       │   └── publishing.ts          # 发布 ETAPI 端点
+│       ├── routes/
+│       │   ├── api/
+│       │   │   ├── llm_chat.ts        # LLM 聊天路由
+│       │   │   └── publisher_frontend.ts
+│       │   └── routes.ts              # 路由注册
+│       └── services/
+│           ├── llm/                   # LLM 服务
+│           ├── media_host/lskypro.ts  # Lsky Pro 图床
+│           └── publisher/             # 发布引擎
+└── README.md
+```
 
-## 💖 Sponsors
+---
 
-<table>
-  <tr>
-    <td align="center" width="25%">
-      <a href="https://www.netperfect.fr">
-        <img src="https://www.netperfect.fr/sites/default/files/Logo%20NetPerfect%20V4%20250px_0.png" width="64" alt="NetPerfect logo" /><br />
-        <b>NetPerfect</b>
-      </a>
-      <br />EV certificate &amp; Windows CI
-    </td>
-    <td align="center" width="50%">
-      <a href="https://ckeditor.com/ckeditor-5/features/">
-        <img src="./docs/logo-ck.svg" width="180" alt="CKEditor logo" /><br />
-        <b>CKEditor</b>
-      </a>
-      <br />Premium editor features
-    </td>
-    <td align="center" width="25%">
-      <a href="https://dosu.dev/">
-        <img src="https://dosu.dev/hero-new/dosu-icon.svg" width="64" height="64" alt="Dosu logo" /><br />
-        <b>Dosu</b>
-      </a>
-      <br />Automated GitHub support
-    </td>
-  </tr>
-</table>
+## 🔄 上游同步
 
-## 👏 Shoutouts
+```bash
+# 添加上游仓库
+git remote add upstream https://github.com/TriliumNext/Trilium.git
 
-* [zadam](https://github.com/zadam) for the original concept and implementation of the application.
-* [Sarah Hussein](https://github.com/Sarah-Hussein) for designing the application icon.
-* [nriver](https://github.com/nriver) for his work on internationalization.
-* [Thomas Frei](https://github.com/thfrei) for his original work on the Canvas.
-* [antoniotejada](https://github.com/nriver) for the original syntax highlight widget.
-* [Tabler Icons](https://tabler.io/icons) for the system tray icons.
+# 拉取上游更新
+git fetch upstream
 
-Trilium would not be possible without the technologies behind it:
+# 合并到本地
+git merge upstream/main
 
-* [CKEditor 5](https://github.com/ckeditor/ckeditor5) - the visual editor behind text notes.
-* [CodeMirror](https://github.com/codemirror/CodeMirror) - code editor with support for huge amount of languages.
-* [Excalidraw](https://github.com/excalidraw/excalidraw) - the infinite whiteboard used in Canvas notes.
-* [Mind Elixir](https://github.com/SSShooter/mind-elixir-core) - providing the mind map functionality.
-* [Leaflet](https://github.com/Leaflet/Leaflet) - for rendering geographical maps.
-* [Tabulator](https://github.com/olifolkerd/tabulator) - for the interactive table used in collections.
-* [FancyTree](https://github.com/mar10/fancytree) - feature-rich tree library without real competition. 
-* [jsPlumb](https://github.com/jsplumb/jsplumb) - visual connectivity library. Used in [relation maps](https://docs.triliumnotes.org/user-guide/note-types/relation-map) and [link maps](https://docs.triliumnotes.org/user-guide/advanced-usage/note-map#link-map)
+# 推送到自己的 fork
+git push fork main
+```
 
-## 🤝 Support
+---
 
-Trilium is built and maintained with [hundreds of hours of work](https://github.com/TriliumNext/Trilium/graphs/commit-activity). Your support keeps it open-source, improves features, and covers costs such as hosting.
+## 📄 License
 
-Consider supporting the main developer ([eliandoran](https://github.com/eliandoran)) of the application via:
+本项目基于 TriliumNext，遵循 [AGPL-3.0 License](LICENSE)。
 
-- [GitHub Sponsors](https://github.com/sponsors/eliandoran)
-- [PayPal](https://paypal.me/eliandoran)
-- [Buy Me a Coffee](https://buymeacoffee.com/eliandoran)
+---
 
+<div align="center">
 
-## 🔑 License
+**基于 [TriliumNext](https://github.com/TriliumNext/Trilium) 构建**
 
-Copyright 2017-2025 zadam, Elian Doran, and other contributors
-
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+</div>
