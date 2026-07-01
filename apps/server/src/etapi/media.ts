@@ -19,8 +19,20 @@ import { becca, getLog, options as optionService } from "@triliumnext/core";
 import eu from "./etapi_utils.js";
 import { parseLskyProConfig } from "../services/media_host/lskypro.js";
 
-/** Option name where media host config is stored */
-const MEDIA_HOST_CONFIG_OPTION = "mediaHostConfig";
+/** Read Lsky Pro config from individual options (lskyApiUrl, lskyToken, etc.) */
+function getLskyProConfigJson(): string | null {
+    const baseUrl = optionService.getOptionOrNull("lskyApiUrl");
+    const token = optionService.getOptionOrNull("lskyToken");
+    if (!baseUrl || !token) return null;
+    const config: Record<string, any> = {
+        baseUrl,
+        token,
+        strategyId: parseInt(optionService.getOptionOrNull("lskyStrategyId") || "1", 10) || 1,
+        albumId: parseInt(optionService.getOptionOrNull("lskyAlbumId") || "0", 10) || 0,
+        publicDomain: optionService.getOptionOrNull("lskyPublicDomain") || "",
+    };
+    return JSON.stringify(config);
+}
 
 function register(router: Router) {
     /**
@@ -28,7 +40,7 @@ function register(router: Router) {
      * Returns the current media host configuration status.
      */
     eu.route(router, "get", "/etapi/media/config", (req, res) => {
-        const configJson = optionService.getOptionOrNull(MEDIA_HOST_CONFIG_OPTION);
+        const configJson = getLskyProConfigJson();
         const { host, error } = parseLskyProConfig(configJson || undefined);
 
         res.json({
@@ -46,14 +58,16 @@ function register(router: Router) {
      *   baseUrl: string,
      *   token: string,
      *   strategyId?: number,
+     *   albumId?: number,
      *   publicDomain?: string,
      * }
      */
-    eu.route(router, "post", "/etapi/media/save-config", (req, res) => {
-        const { baseUrl, token, strategyId, publicDomain } = req.body as {
+     eu.route(router, "post", "/etapi/media/save-config", (req, res) => {
+         const { baseUrl, token, strategyId, albumId, publicDomain } = req.body as {
             baseUrl: string;
             token: string;
             strategyId?: number;
+             albumId?: number;
             publicDomain?: string;
         };
 
@@ -65,6 +79,7 @@ function register(router: Router) {
             baseUrl,
             token,
             strategyId: strategyId || 1,
+             albumId: albumId || 0,
             publicDomain: publicDomain || "",
         };
 
@@ -78,7 +93,7 @@ function register(router: Router) {
      * Test the configured media host connection.
      */
     eu.route(router, "post", "/etapi/media/test", async (req, res) => {
-        const configJson = optionService.getOptionOrNull(MEDIA_HOST_CONFIG_OPTION);
+        const configJson = getLskyProConfigJson();
         const { host, error } = parseLskyProConfig(configJson || undefined);
 
         if (!host) {
@@ -104,7 +119,7 @@ function register(router: Router) {
      * Returns: { success: true, url: "https://..." }
      */
     eu.route(router, "post", "/etapi/media/upload", async (req, res) => {
-        const configJson = optionService.getOptionOrNull(MEDIA_HOST_CONFIG_OPTION);
+        const configJson = getLskyProConfigJson();
         const { host, error } = parseLskyProConfig(configJson || undefined);
 
         if (!host) {
@@ -151,7 +166,7 @@ function register(router: Router) {
      * Returns: { success: true, originalUrl: string, newUrl: string }
      */
     eu.route(router, "post", "/etapi/media/upload-url", async (req, res) => {
-        const configJson = optionService.getOptionOrNull(MEDIA_HOST_CONFIG_OPTION);
+        const configJson = getLskyProConfigJson();
         const { host, error } = parseLskyProConfig(configJson || undefined);
 
         if (!host) {
@@ -194,4 +209,6 @@ function register(router: Router) {
     });
 }
 
-export default register;
+export default {
+    register
+};

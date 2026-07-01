@@ -26,13 +26,15 @@ export class LskyProHost implements MediaHost {
     private baseUrl: string;
     private token: string;
     private strategyId: number;
+    private albumId?: number;
     private publicDomain?: string;
 
-    constructor(baseUrl: string, token: string, options?: { strategyId?: number; publicDomain?: string }) {
+    constructor(baseUrl: string, token: string, options?: { strategyId?: number; albumId?: number; publicDomain?: string }) {
         // Normalize base URL (remove trailing slash)
         this.baseUrl = baseUrl.replace(/\/+$/, "");
         this.token = token;
         this.strategyId = options?.strategyId ?? 1;
+        this.albumId = options?.albumId;
         this.publicDomain = options?.publicDomain;
     }
 
@@ -66,16 +68,20 @@ export class LskyProHost implements MediaHost {
         const boundary = randomBoundary();
 
         // Build multipart body
-        const header1 = `--${boundary}\r\nContent-Disposition: form-data; name="strategy_id"\r\n\r\n${this.strategyId}\r\n`;
-        const header2 = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
-        const footer = `\r\n--${boundary}--\r\n`;
+        const parts: string[] = [];
+        parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="strategy_id"\r\n\r\n${this.strategyId}`);
+        if (this.albumId) {
+            parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="album_id"\r\n\r\n${this.albumId}`);
+        }
+        parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n`);
 
-        const body = Buffer.concat([
-            Buffer.from(header1, "utf-8"),
-            Buffer.from(header2, "utf-8"),
-            data,
-            Buffer.from(footer, "utf-8"),
-        ]);
+        const bodyParts: Buffer[] = [];
+        for (const part of parts) {
+            bodyParts.push(Buffer.from(part, "utf-8"));
+        }
+        bodyParts.push(data);
+        bodyParts.push(Buffer.from(`\r\n--${boundary}--\r\n`, "utf-8"));
+        const body = Buffer.concat(bodyParts);
 
         const url = `${this.baseUrl}/api/v1/upload`;
         const urlObj = new URL(url);
@@ -203,6 +209,7 @@ export function parseLskyProConfig(jsonString?: string): { host: LskyProHost | n
 
         const host = new LskyProHost(baseUrl, token, {
             strategyId: config["strategyId"] || 1,
+            albumId: config["albumId"] || config["album_id"],
             publicDomain: config["publicDomain"],
         });
 

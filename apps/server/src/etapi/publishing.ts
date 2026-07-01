@@ -176,4 +176,6 @@ function register(router: Router) {
     });
 }
 
-export default register;
+export default {
+    register
+};
