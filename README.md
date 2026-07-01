@@ -1,6 +1,6 @@
 <div align="center">
 
-# TriliumNext Custom
+# TriliumNext 增强版(集成自媒体+Lsky Pro 图床）
 
 **基于 TriliumNext v0.103.0 的自定义版本**
 增强 AI/LLM 集成 + 自媒体发布引擎 + Lsky Pro 图床
